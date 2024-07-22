@@ -1,11 +1,13 @@
 [package]
 name = "angled-random-walker"
 description = "Angled Random Walker approach to Brownian tree generation."
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/bharadwaj-raju/angled-random-walker"
 
 [dependencies]
-rand = "0.8.5"
+rand = { version = "0.8.5", default-features = false, features = ["alloc"] }
+rand_xoshiro = "0.6.0"
+

@@ -6,7 +6,8 @@
 //! Useful for procedurally generating heightmaps.
 
 use rand::distributions::{Distribution, WeightedIndex};
-use rand::{thread_rng, Rng};
+use rand::{Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 #[derive(Clone, Copy)]
 struct Direction(i32, i32);
@@ -50,14 +51,12 @@ fn angle_to_direction_weights(angle: f64) -> [f64; 8] {
     weights.map(|w| w - least_likely)
 }
 
-fn choose_direction(angle: f64) -> Direction {
+fn choose_direction(angle: f64, rng: &mut Xoshiro256PlusPlus) -> Direction {
     let dist = WeightedIndex::new(angle_to_direction_weights(angle)).unwrap();
-    let mut rng = thread_rng();
-    DIRECTIONS[dist.sample(&mut rng)]
+    DIRECTIONS[dist.sample(rng)]
 }
 
-fn angle_displace_random(angle: f64, divergence: f64) -> f64 {
-    let mut rng = thread_rng();
+fn angle_displace_random(angle: f64, divergence: f64, rng: &mut Xoshiro256PlusPlus) -> f64 {
     (angle + rng.gen_range(-divergence..divergence)).clamp(0.00, 2.00)
 }
 
@@ -127,6 +126,8 @@ pub struct SimulationParams {
     pub initial_walkers: InitialWalkers,
     /// How maximum age varies.
     pub max_age_dropoff: MaxAgeDropoff,
+    /// Seed for the randomness.
+    pub seed: u64,
 }
 
 /// Main simulation function.
@@ -153,6 +154,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
             })
             .collect(),
     };
+    let mut rng = Xoshiro256PlusPlus::seed_from_u64(params.seed);
     while !walkers.is_empty() {
         let mut next_walkers: Vec<AngledRandomWalker> = Vec::new();
         for walker in &walkers {
@@ -172,13 +174,14 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                         angle: angle_displace_random(
                             walker.angle,
                             params.max_child_angle_divergence.clamp(0.00, 2.00),
+                            &mut rng,
                         ),
                     });
                 }
             } else {
                 let Position(x, y) = walker
                     .position
-                    .move_in(choose_direction(walker.angle), params.size);
+                    .move_in(choose_direction(walker.angle, &mut rng), params.size);
                 grid[y][x] = match params.paint {
                     Paint::Age => walker.age + 1,
                     Paint::CumulativeAge => walker.cumulative_age + walker.age + 1,
