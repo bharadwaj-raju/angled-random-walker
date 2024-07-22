@@ -60,18 +60,18 @@ fn angle_displace_random(angle: f64, divergence: f64, rng: &mut Xoshiro256PlusPl
     (angle + rng.gen_range(-divergence..divergence)).clamp(0.00, 2.00)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Position(usize, usize);
 
 impl Position {
     fn move_in(&self, dir: Direction, size: usize) -> Self {
-        let x = ((self.0 as i32) + dir.0).clamp(0, size as i32) as usize;
-        let y = ((self.1 as i32) + dir.1).clamp(0, size as i32) as usize;
+        let x = ((self.0 as i32) + dir.0).clamp(0, (size - 1) as i32) as usize;
+        let y = ((self.1 as i32) + dir.1).clamp(0, (size - 1) as i32) as usize;
         Self(x, y)
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct AngledRandomWalker {
     age: usize,
     cumulative_age: usize,
@@ -164,19 +164,21 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                     params.max_age / 2_usize.pow(walker.generation as u32)
                 }
             };
-            if walker.age > max_age && walker.generation < params.max_generations {
-                for _ in 0..params.children {
-                    next_walkers.push(AngledRandomWalker {
-                        age: 0,
-                        cumulative_age: walker.age,
-                        generation: walker.generation + 1,
-                        position: walker.position,
-                        angle: angle_displace_random(
-                            walker.angle,
-                            params.max_child_angle_divergence.clamp(0.00, 2.00),
-                            &mut rng,
-                        ),
-                    });
+            if walker.age > max_age {
+                if walker.generation < params.max_generations {
+                    for _ in 0..params.children {
+                        next_walkers.push(AngledRandomWalker {
+                            age: 0,
+                            cumulative_age: walker.age,
+                            generation: walker.generation + 1,
+                            position: walker.position,
+                            angle: angle_displace_random(
+                                walker.angle,
+                                params.max_child_angle_divergence.clamp(0.00, 2.00),
+                                &mut rng,
+                            ),
+                        });
+                    }
                 }
             } else {
                 let Position(x, y) = walker
@@ -188,7 +190,13 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                     Paint::Generation => walker.generation + 1,
                     Paint::Constant => 1,
                 } as u8;
-                next_walkers.push(*walker);
+                next_walkers.push(AngledRandomWalker {
+                    age: walker.age + 1,
+                    cumulative_age: walker.cumulative_age,
+                    generation: walker.generation,
+                    position: Position(x, y),
+                    angle: walker.angle,
+                });
             }
         }
         walkers = next_walkers;
