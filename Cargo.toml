@@ -5,6 +5,7 @@ version = "0.1.0"
 edition = "2021"
 readme = "README.md"
 license = "MIT"
+repository = "https://github.com/bharadwaj-raju/angled-random-walker"
 
 [dependencies]
 rand = "0.8.5"
