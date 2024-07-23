@@ -134,8 +134,8 @@ pub struct SimulationParams {
 }
 
 /// Main simulation function.
-pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
-    let mut grid = vec![vec![0u8; params.size]; params.size];
+pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
+    let mut grid = vec![vec![0u16; params.size]; params.size];
     let mut walkers: Vec<AngledRandomWalker> = match params.initial_walkers {
         InitialWalkers::CardinalsAndOrdinals => (0..8)
             .map(|n| AngledRandomWalker {
@@ -211,7 +211,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                     Paint::CumulativeAge => walker.cumulative_age + walker.age + 1,
                     Paint::Generation => walker.generation + 1,
                     Paint::Constant => 1,
-                } as u8;
+                } as u16;
                 next_walkers.push(AngledRandomWalker {
                     kind: walker.kind,
                     age: walker.age + 1,
