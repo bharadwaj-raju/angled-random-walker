@@ -1,7 +1,7 @@
 [package]
 name = "angled-random-walker"
 description = "Angled Random Walker approach to Brownian tree generation."
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 readme = "README.md"
 license = "MIT"

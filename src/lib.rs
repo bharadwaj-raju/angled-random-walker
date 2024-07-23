@@ -174,7 +174,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                 next_walkers.push(AngledRandomWalker {
                     kind: WalkerKind::Short,
                     age: 0,
-                    cumulative_age: walker.age,
+                    cumulative_age: walker.cumulative_age + walker.age,
                     generation: walker.generation + 1,
                     position: walker.position,
                     angle: angle_displace_random(
@@ -190,7 +190,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                         next_walkers.push(AngledRandomWalker {
                             kind: WalkerKind::Long,
                             age: 0,
-                            cumulative_age: walker.age,
+                            cumulative_age: walker.cumulative_age + walker.age,
                             generation: walker.generation + 1,
                             position: walker.position,
                             angle: angle_displace_random(
