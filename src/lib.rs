@@ -71,8 +71,15 @@ impl Position {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum WalkerKind {
+    Short,
+    Long,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct AngledRandomWalker {
+    kind: WalkerKind,
     age: usize,
     cumulative_age: usize,
     generation: usize,
@@ -100,32 +107,28 @@ pub enum InitialWalkers {
     Custom(Vec<f64>),
 }
 
-/// Determines how the maximum age a walker survives to varies.
-pub enum MaxAgeDropoff {
-    /// The maximum age is held constant at [`SimulationParams::max_age`].
-    Constant,
-    /// The maximum age starts at [`SimulationParams::max_age`] but is halved each generation.
-    HalvesWithGeneration,
-}
-
 /// The parameters that control the simulation.
 pub struct SimulationParams {
     /// Size of the grid.
     pub size: usize,
-    /// Maximum age that walkers survive to.
-    pub max_age: usize,
+    /// Maximum age that long walkers survive to.
+    pub max_long_age: usize,
+    /// Maximum age that short walkers survive to.
+    pub max_short_age: usize,
     /// Maximum generations of walkers.
     pub max_generations: usize,
     /// How many children a walker spawns when it ends.
     pub children: usize,
-    /// Maximum angle that a child walker can diverge from its parent. Angles are in units of Pi radians, and clamped to `0.00..=2.00`.
-    pub max_child_angle_divergence: f64,
+    /// Maximum angle that a long walker can diverge from its parent. Angles are in units of Pi radians, and clamped to `0.00..=2.00`.
+    pub max_long_angle_divergence: f64,
+    /// Maximum angle that a short walker can diverge from its parent. Angles are in units of Pi radians, and clamped to `0.00..=2.00`.
+    pub max_short_angle_divergence: f64,
+    /// How often a long walker produces a short branch.
+    pub short_branch_frequency: usize,
     /// What to fill the grid with.
     pub paint: Paint,
     /// How to place initial walkers.
     pub initial_walkers: InitialWalkers,
-    /// How maximum age varies.
-    pub max_age_dropoff: MaxAgeDropoff,
     /// Seed for the randomness.
     pub seed: u64,
 }
@@ -136,6 +139,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
     let mut walkers: Vec<AngledRandomWalker> = match params.initial_walkers {
         InitialWalkers::CardinalsAndOrdinals => (0..8)
             .map(|n| AngledRandomWalker {
+                kind: WalkerKind::Long,
                 age: 0,
                 cumulative_age: 0,
                 generation: 0,
@@ -146,6 +150,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
         InitialWalkers::Custom(angles) => angles
             .into_iter()
             .map(|angle| AngledRandomWalker {
+                kind: WalkerKind::Long,
                 age: 0,
                 cumulative_age: 0,
                 generation: 0,
@@ -158,23 +163,39 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
     while !walkers.is_empty() {
         let mut next_walkers: Vec<AngledRandomWalker> = Vec::new();
         for walker in &walkers {
-            let max_age = match params.max_age_dropoff {
-                MaxAgeDropoff::Constant => params.max_age,
-                MaxAgeDropoff::HalvesWithGeneration => {
-                    params.max_age / 2_usize.pow(walker.generation as u32)
-                }
+            let max_age = match walker.kind {
+                WalkerKind::Short => params.max_short_age,
+                WalkerKind::Long => params.max_long_age,
             };
+            if walker.age % params.short_branch_frequency == 0
+                && walker.kind != WalkerKind::Short
+                && walker.generation < params.max_generations
+            {
+                next_walkers.push(AngledRandomWalker {
+                    kind: WalkerKind::Short,
+                    age: 0,
+                    cumulative_age: walker.age,
+                    generation: walker.generation + 1,
+                    position: walker.position,
+                    angle: angle_displace_random(
+                        walker.angle,
+                        params.max_short_angle_divergence.clamp(0.00, 2.00),
+                        &mut rng,
+                    ),
+                })
+            }
             if walker.age > max_age {
-                if walker.generation < params.max_generations {
+                if walker.generation < params.max_generations && walker.kind != WalkerKind::Short {
                     for _ in 0..params.children {
                         next_walkers.push(AngledRandomWalker {
+                            kind: WalkerKind::Long,
                             age: 0,
                             cumulative_age: walker.age,
                             generation: walker.generation + 1,
                             position: walker.position,
                             angle: angle_displace_random(
                                 walker.angle,
-                                params.max_child_angle_divergence.clamp(0.00, 2.00),
+                                params.max_long_angle_divergence.clamp(0.00, 2.00),
                                 &mut rng,
                             ),
                         });
@@ -184,6 +205,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                 let Position(x, y) = walker
                     .position
                     .move_in(choose_direction(walker.angle, &mut rng), params.size);
+
                 grid[y][x] = match params.paint {
                     Paint::Age => walker.age + 1,
                     Paint::CumulativeAge => walker.cumulative_age + walker.age + 1,
@@ -191,6 +213,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u8>> {
                     Paint::Constant => 1,
                 } as u8;
                 next_walkers.push(AngledRandomWalker {
+                    kind: walker.kind,
                     age: walker.age + 1,
                     cumulative_age: walker.cumulative_age,
                     generation: walker.generation,
