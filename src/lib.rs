@@ -159,7 +159,9 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
             })
             .collect(),
     };
-    let mut rng = Xoshiro256PlusPlus::seed_from_u64(params.seed);
+    let mut rng_direction_chooser = Xoshiro256PlusPlus::seed_from_u64(params.seed);
+    let mut rng_short_diverger = Xoshiro256PlusPlus::seed_from_u64(params.seed);
+    let mut rng_long_diverger = Xoshiro256PlusPlus::seed_from_u64(params.seed);
     while !walkers.is_empty() {
         let mut next_walkers: Vec<AngledRandomWalker> = Vec::new();
         for walker in &walkers {
@@ -180,7 +182,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
                     angle: angle_displace_random(
                         walker.angle,
                         params.max_short_angle_divergence.clamp(0.00, 2.00),
-                        &mut rng,
+                        &mut rng_short_diverger,
                     ),
                 })
             }
@@ -196,15 +198,16 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
                             angle: angle_displace_random(
                                 walker.angle,
                                 params.max_long_angle_divergence.clamp(0.00, 2.00),
-                                &mut rng,
+                                &mut rng_long_diverger,
                             ),
                         });
                     }
                 }
             } else {
-                let Position(x, y) = walker
-                    .position
-                    .move_in(choose_direction(walker.angle, &mut rng), params.size);
+                let Position(x, y) = walker.position.move_in(
+                    choose_direction(walker.angle, &mut rng_direction_chooser),
+                    params.size,
+                );
 
                 grid[y][x] = match params.paint {
                     Paint::Age => walker.age + 1,
