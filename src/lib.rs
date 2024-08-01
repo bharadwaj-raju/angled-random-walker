@@ -133,6 +133,13 @@ pub struct SimulationParams {
     pub seed: u64,
 }
 
+struct ShortWalkerSpawn {
+    position: Position,
+    angle: f64,
+    generation: usize,
+    cumulative_age: usize,
+}
+
 /// Main simulation function.
 pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
     let mut grid = vec![vec![0u16; params.size]; params.size];
@@ -162,7 +169,7 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
     let mut rng_direction_chooser = Xoshiro256PlusPlus::seed_from_u64(params.seed);
     let mut rng_short_diverger = Xoshiro256PlusPlus::seed_from_u64(params.seed);
     let mut rng_long_diverger = Xoshiro256PlusPlus::seed_from_u64(params.seed);
-    let mut short_walker_spawns: Vec<(Position, f64, usize)> = Vec::new();
+    let mut short_walker_spawns: Vec<ShortWalkerSpawn> = Vec::new();
     while !walkers.is_empty() {
         let mut next_walkers: Vec<AngledRandomWalker> = Vec::new();
         for walker in &walkers {
@@ -174,11 +181,12 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
                 && walker.kind != WalkerKind::Short
                 && walker.generation < params.max_generations
             {
-                short_walker_spawns.push((
-                    walker.position,
-                    walker.angle,
-                    walker.cumulative_age + walker.age,
-                ));
+                short_walker_spawns.push(ShortWalkerSpawn {
+                    position: walker.position,
+                    angle: walker.angle,
+                    generation: walker.generation + 1,
+                    cumulative_age: walker.cumulative_age + walker.age,
+                });
             }
             if walker.age > max_age {
                 if walker.generation < params.max_generations && walker.kind != WalkerKind::Short {
@@ -223,18 +231,25 @@ pub fn simulate(params: SimulationParams) -> Vec<Vec<u16>> {
     }
     let mut short_walkers: Vec<AngledRandomWalker> = short_walker_spawns
         .iter()
-        .map(|(position, angle, cumulative_age)| AngledRandomWalker {
-            kind: WalkerKind::Short,
-            age: 0,
-            cumulative_age: *cumulative_age,
-            generation: 0,
-            position: *position,
-            angle: angle_displace_random(
-                *angle,
-                params.max_short_angle_divergence,
-                &mut rng_short_diverger,
-            ),
-        })
+        .map(
+            |ShortWalkerSpawn {
+                 position,
+                 angle,
+                 generation,
+                 cumulative_age,
+             }| AngledRandomWalker {
+                kind: WalkerKind::Short,
+                age: 0,
+                cumulative_age: *cumulative_age,
+                generation: *generation,
+                position: *position,
+                angle: angle_displace_random(
+                    *angle,
+                    params.max_short_angle_divergence,
+                    &mut rng_short_diverger,
+                ),
+            },
+        )
         .collect();
     while !short_walkers.is_empty() {
         let mut next_short_walkers: Vec<AngledRandomWalker> = Vec::new();
